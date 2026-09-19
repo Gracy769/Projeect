@@ -1,0 +1,213 @@
+function induction_motor_braking()
+% Induction Motor Regenerative Braking Simulator
+% Interactive GUI overhaul.
+% No more manual console inputs. Play with the sliders and watch the physics adjust on the fly.
+
+% Close any old instances
+close all; clc;
+
+% --- Default Parameters ---
+p.v0_kmh   = 120;
+p.mass_t   = 200;
+p.a_conv   = 0.5;
+p.t_max    = 1800;
+p.n_motors = 8;
+p.s_target = -0.12;
+
+% Motor / Drivetrain fixed constants
+p.P       = 4;
+p.sm      = 0.15;
+p.r_wheel = 0.46;
+p.gear    = 5.5;
+
+% --- Setup Figure ---
+fig = figure('Name', 'Induction Motor Regen Braking', ...
+             'NumberTitle', 'off', ...
+             'Position', [100, 100, 1100, 700], ...
+             'Color', [0.12 0.12 0.12]);
+
+% --- Axes ---
+% We'll use a 2x3 grid, panel takes left col, axes take the rest
+ax1 = subplot(2, 3, 2, 'Parent', fig, 'Color', [0.18 0.18 0.18], 'XColor', 'w', 'YColor', 'w');
+ax2 = subplot(2, 3, 3, 'Parent', fig, 'Color', [0.18 0.18 0.18], 'XColor', 'w', 'YColor', 'w');
+ax3 = subplot(2, 3, 5, 'Parent', fig, 'Color', [0.18 0.18 0.18], 'XColor', 'w', 'YColor', 'w');
+ax4 = subplot(2, 3, 6, 'Parent', fig, 'Color', [0.18 0.18 0.18], 'XColor', 'w', 'YColor', 'w');
+
+% --- Control Panel ---
+panel = uipanel('Parent', fig, 'Title', 'Parameters', ...
+                'Position', [0.02 0.05 0.28 0.9], ...
+                'BackgroundColor', [0.15 0.15 0.15], ...
+                'ForegroundColor', 'w', 'FontWeight', 'bold', 'FontSize', 11);
+
+y_pos = 0.88;
+dy = 0.11;
+
+[sl_v0, txt_v0]     = create_slider(panel, 'Initial Speed (km/h)', 10, 350, p.v0_kmh, y_pos, @update_sim); y_pos = y_pos - dy;
+[sl_m, txt_m]       = create_slider(panel, 'Mass (tonnes)', 50, 2000, p.mass_t, y_pos, @update_sim); y_pos = y_pos - dy;
+[sl_a, txt_a]       = create_slider(panel, 'Friction Decel (m/s^2)', 0.1, 3.0, p.a_conv, y_pos, @update_sim); y_pos = y_pos - dy;
+[sl_s, txt_s]       = create_slider(panel, 'Target Slip (Regen)', -0.5, -0.01, p.s_target, y_pos, @update_sim); y_pos = y_pos - dy;
+[sl_tmax, txt_tmax] = create_slider(panel, 'Motor T_max (N.m)', 500, 5000, p.t_max, y_pos, @update_sim); y_pos = y_pos - dy;
+[sl_nm, txt_nm]     = create_slider(panel, 'Number of Motors', 2, 24, p.n_motors, y_pos, @update_sim); 
+% Fix slider step for integer motors (22 steps for range 2-24)
+set(sl_nm, 'SliderStep', [1/22, 1/22]);
+y_pos = y_pos - dy - 0.05;
+
+% Results Text Display
+txt_res = uicontrol('Parent', panel, 'Style', 'text', ...
+                    'Units', 'normalized', 'Position', [0.05 0.02 0.9 y_pos], ...
+                    'BackgroundColor', [0.15 0.15 0.15], 'ForegroundColor', [0.3 1.0 0.5], ...
+                    'HorizontalAlignment', 'left', 'FontSize', 11, 'FontName', 'Consolas');
+
+% Add listeners for continuous updates during slider drag (if supported)
+try
+    addlistener(sl_v0, 'ContinuousValueChange', @update_sim);
+    addlistener(sl_m, 'ContinuousValueChange', @update_sim);
+    addlistener(sl_a, 'ContinuousValueChange', @update_sim);
+    addlistener(sl_s, 'ContinuousValueChange', @update_sim);
+    addlistener(sl_tmax, 'ContinuousValueChange', @update_sim);
+    addlistener(sl_nm, 'ContinuousValueChange', @update_sim);
+catch
+    % Fallback for older MATLABs where ContinuousValueChange isn't available
+end
+
+% Initial Render
+update_sim();
+
+    % --- Helper Function: Create Slider UI ---
+    function [slider, val_txt] = create_slider(parent, label, min_val, max_val, default_val, y, callback)
+        uicontrol('Parent', parent, 'Style', 'text', 'String', label, ...
+                  'Units', 'normalized', 'Position', [0.05 y 0.6 0.04], ...
+                  'BackgroundColor', [0.15 0.15 0.15], 'ForegroundColor', 'w', ...
+                  'HorizontalAlignment', 'left', 'FontSize', 10);
+        
+        val_txt = uicontrol('Parent', parent, 'Style', 'text', 'String', num2str(default_val, '%.2f'), ...
+                            'Units', 'normalized', 'Position', [0.65 y 0.3 0.04], ...
+                            'BackgroundColor', [0.15 0.15 0.15], 'ForegroundColor', 'c', ...
+                            'HorizontalAlignment', 'right', 'FontWeight', 'bold', 'FontSize', 10);
+        
+        slider = uicontrol('Parent', parent, 'Style', 'slider', ...
+                           'Min', min_val, 'Max', max_val, 'Value', default_val, ...
+                           'Units', 'normalized', 'Position', [0.05 y-0.04 0.9 0.04], ...
+                           'Callback', callback);
+    end
+
+    % --- Main Callback: Physics & Plotting ---
+    function update_sim(~, ~)
+        % 1. Read values from sliders
+        p.v0_kmh   = get(sl_v0, 'Value');
+        p.mass_t   = get(sl_m, 'Value');
+        p.a_conv   = get(sl_a, 'Value');
+        p.s_target = get(sl_s, 'Value');
+        p.t_max    = get(sl_tmax, 'Value');
+        p.n_motors = round(get(sl_nm, 'Value'));
+        
+        % Update text labels
+        set(txt_v0, 'String', num2str(p.v0_kmh, '%.1f'));
+        set(txt_m, 'String', num2str(p.mass_t, '%.0f'));
+        set(txt_a, 'String', num2str(p.a_conv, '%.2f'));
+        set(txt_s, 'String', num2str(p.s_target, '%.3f'));
+        set(txt_tmax, 'String', num2str(p.t_max, '%.0f'));
+        set(txt_nm, 'String', num2str(p.n_motors, '%d'));
+        
+        % 2. Math & ODE
+        v0 = p.v0_kmh / 3.6;
+        m  = p.mass_t * 1000;
+        
+        % Torque-slip Kloss formula
+        kloss = @(s) 2 * p.t_max ./ (s ./ p.sm + p.sm ./ s);
+        
+        T_op = kloss(p.s_target);
+        % Force contribution (brake force is positive here to add to decel)
+        F_op = p.n_motors * max(0, -T_op) * p.gear / p.r_wheel;
+        a_motor = F_op / m;
+        
+        odefun = @(t, v) -(p.a_conv + a_motor);
+        % Solve ODE
+        [t, v] = ode45(odefun, [0 200], v0);
+        v(v < 0) = 0; % clamp
+        
+        % Trim Arrays
+        stop_idx = find(v <= 1e-3, 1, 'first');
+        if isempty(stop_idx), stop_idx = length(v); end
+        t = t(1:stop_idx);
+        v = v(1:stop_idx);
+        x = cumtrapz(t, v);
+        
+        % Conventional comparison
+        t_stop_conv = v0 / p.a_conv;
+        d_stop_conv = v0^2 / (2*p.a_conv);
+        
+        % Regen results
+        t_stop = t(end);
+        d_stop = x(end);
+        
+        % Energy
+        W_total = 0.5 * m * v0^2;
+        regen_eff = 0.85;
+        motor_frac = a_motor / (p.a_conv + a_motor);
+        W_regen = W_total * motor_frac * regen_eff;
+        regen_kWh = W_regen / 3.6e6;
+        co2_saved = regen_kWh * 0.233;
+        homes_days = regen_kWh / 8.0;
+
+        % 3. Update Text Display
+        res_str = sprintf(['--- SIMULATION RESULTS ---\n\n' ...
+                           'Motor Decel:   +%.3f m/s^2\n' ...
+                           'Total Decel:   -%.3f m/s^2\n\n' ...
+                           'Stop Time (Regen): %.1f s\n' ...
+                           'Stop Time (Conv):  %.1f s\n' ...
+                           'Stop Dist (Regen): %.1f m\n' ...
+                           'Stop Dist (Conv):  %.1f m\n\n' ...
+                           'Energy Banked: %.1f kWh\n' ...
+                           'CO2 Saved:     %.1f kg\n' ...
+                           'Homes Powered: %.1f days'], ...
+                           a_motor, (p.a_conv + a_motor), ...
+                           t_stop, t_stop_conv, d_stop, d_stop_conv, ...
+                           regen_kWh, co2_saved, homes_days);
+        set(txt_res, 'String', res_str);
+
+        % 4. Render Plots
+        % Plot 1: Torque-Slip
+        cla(ax1);
+        s_range = linspace(-0.9, 0.9, 400);
+        s_range(abs(s_range) < 1e-3) = 1e-3;
+        T_range = kloss(s_range);
+        plot(ax1, [-1 1], [0 0], 'w--', 'LineWidth', 1); hold(ax1, 'on'); % x-axis
+        plot(ax1, [0 0], [-p.t_max*1.5 p.t_max*1.5], 'w:', 'LineWidth', 1); % y-axis
+        plot(ax1, s_range, T_range, 'c', 'LineWidth', 2);
+        plot(ax1, p.s_target, T_op, 'ro', 'MarkerFaceColor', 'r', 'MarkerSize', 8);
+        xlabel(ax1, 'Slip s'); ylabel(ax1, 'Torque (N.m)');
+        title(ax1, 'Kloss Torque-Slip', 'Color', 'w');
+        grid(ax1, 'on');
+
+        % Plot 2: Velocity
+        cla(ax2);
+        t_conv = linspace(0, t_stop_conv, 200);
+        v_conv = max(0, v0 - p.a_conv .* t_conv);
+        plot(ax2, t_conv, v_conv, 'w--', 'LineWidth', 1.5); hold(ax2, 'on');
+        plot(ax2, t, v, 'g-', 'LineWidth', 2.5);
+        xlabel(ax2, 'Time (s)'); ylabel(ax2, 'Velocity (m/s)');
+        title(ax2, 'Braking Profile', 'Color', 'w');
+        legend(ax2, 'Conv. only', 'With Regen', 'TextColor', 'w', 'Color', [0.2 0.2 0.2], 'Location', 'northeast');
+        grid(ax2, 'on');
+
+        % Plot 3: Distance
+        cla(ax3);
+        plot(ax3, t, x, 'y-', 'LineWidth', 2.5);
+        xlabel(ax3, 'Time (s)'); ylabel(ax3, 'Distance (m)');
+        title(ax3, 'Stopping Distance', 'Color', 'w');
+        grid(ax3, 'on');
+
+        % Plot 4: Energy Bar
+        cla(ax4);
+        heat_kWh = W_total/3.6e6 - regen_kWh;
+        b = bar(ax4, [regen_kWh, heat_kWh]);
+        b.FaceColor = 'flat';
+        b.CData(1,:) = [0 0.8 0]; % Green = Regen
+        b.CData(2,:) = [0.8 0 0]; % Red = Friction/Heat
+        set(ax4, 'XTickLabel', {'Regen', 'Friction/Loss'});
+        ylabel(ax4, 'Energy (kWh)');
+        title(ax4, sprintf('Total Kinetic Energy: %.1f kWh', W_total/3.6e6), 'Color', 'w');
+        grid(ax4, 'on');
+    end
+end
