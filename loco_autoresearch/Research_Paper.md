@@ -20,5 +20,13 @@ By observing the Kloss torque equation, we determined that the maximum mechanica
 
 Dynamically varying the slip based on speed or time yielded no further improvements. The integrand of the score function is monotonically decreasing with respect to the applied regenerative braking force. As a result, the optimal strategy across all speeds is to maximize the braking force instantaneously, which is achieved by continuously operating the motors at their breakdown slip.
 
+## Limitations and Real-World Challenges
+While the mathematical model identifies $s = -0.15$ as optimal, applying this sustained maximum torque in physical hardware introduces severe practical challenges:
+- **Magnetic Field Effects**: Generating such intense regenerative braking forces produces extremely strong magnetic fields that risk melting sensitive electrical components and adjacent physical parts.
+- **Electronic Disruption**: The powerful electromagnetic interference (EMI) can severely disrupt locomotive electronics, communication connectivity, data bandwidth, and critical signaling systems.
+- **System Constraints**: To mitigate these effects and safely implement such an aggressive strategy, the affected systems and surrounding shielding would require a complete, prohibitively expensive replacement and redesign.
+
+As such, this project serves purely as a preliminary theoretical study. The report documents mathematical optimums but acknowledges the severe practical challenges of directly applying these findings to existing locomotive hardware, and thus cannot provide deep implementation conclusions.
+
 ## Conclusion
 Under the unconstrained Kloss motor model provided in the simulation environment, the mathematically optimal braking strategy is to apply maximum possible torque at all times by commanding a constant slip of `-0.15`. This minimizes both the stopping distance and maximizes the total regenerated energy without violating any physical limits (as adhesion and jerk constraints were absent from the model).
