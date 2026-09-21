@@ -1,12 +1,5 @@
 # Multi-Domain Parametric Optimization and Hardware Feasibility Analysis of Induction Motor Regenerative and Eddy-Current Braking Systems in Heavy and High-Speed Rail
 
-**Project HELIOS — Advanced Deceleration & Energy Recovery Research Group**  
-*Repository: [Gracy769/Projeect](https://github.com/Gracy769/Projeect)*  
-
-<p align="center">
-  <img src="./figures/project_helios_logo.jpeg" alt="Project Helios" width="160"/>
-</p>
-
 ---
 
 ## Abstract
@@ -286,14 +279,3 @@ This study developed a unified mathematical, simulation, and optimization framew
 3. **Engineering Realism**: The study comprehensively outlined critical hardware barriers—including extreme thermal rail loading, component melting hazards, signaling EMI corruption, and catenary non-receptivity—establishing that practical deployment demands specialized electromagnetic shielding and line-side absorption infrastructure.
 
 Future research will incorporate finite-element thermal modeling of the rail-wheel interface, closed-loop adhesion-limited slip vector control, and hardware-in-the-loop validation of EMI mitigation filters.
-
----
-
-## References & Code Availability
-
-All simulation scripts, parametric data files, and optimization logs are open-source and tracked in the project repository:
-- **Repository**: [Gracy769/Projeect](https://github.com/Gracy769/Projeect)
-- **Simulation Scripts**: `induction_motor_braking_sim.py`, `train_simu.py`, `induction_motor_braking.m`
-- **Autoresearch Framework**: `loco_autoresearch/prepare.py`, `loco_autoresearch/train.py`, `loco_autoresearch/program.md`
-- **Parametric Datasets**: `simulation_100_conditions.csv`, `simulation_statistics_summary.csv`
-- **Figure Assets**: `./figures/`
